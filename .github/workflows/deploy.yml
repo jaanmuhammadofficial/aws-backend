@@ -8,6 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    # Construct a unique bucket name using the actor (username)
+    env:
+      AWS_REGION: us-east-1
+      BUCKET: iac-terraform-be-${{ github.actor }}-bucket
 
     steps:
       - name: Checkout repository
@@ -18,24 +22,30 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
+          aws-region: ${{ env.AWS_REGION }}
 
-      # Ensure S3 bucket exists
       - name: Ensure S3 bucket exists
         run: |
-          BUCKET=<your-unique-bucket-name>
-          if ! aws s3 ls "s3://$BUCKET" >/dev/null 2>&1; then
-            echo "Creating S3 bucket $BUCKET..."
-            aws s3 mb s3://$BUCKET --region us-east-1
-          else
+          # Use the BUCKET from env (no angle brackets!)
+          echo "Using bucket: $BUCKET"
+          # Check existence robustly
+          if aws s3api head-bucket --bucket "$BUCKET" 2>/dev/null; then
             echo "Bucket $BUCKET already exists — skipping creation."
+          else
+            echo "Creating S3 bucket $BUCKET..."
+            # For us-east-1 do not set LocationConstraint; for other regions set it.
+            if [ "$AWS_REGION" = "us-east-1" ]; then
+              aws s3api create-bucket --bucket "$BUCKET"
+            else
+              aws s3api create-bucket --bucket "$BUCKET" --create-bucket-configuration LocationConstraint="$AWS_REGION"
+            fi
           fi
 
-      # Sync repo files to S3
       - name: Sync files to S3
-        run: aws s3 sync . s3://<your-unique-bucket-name> --delete --exclude ".git/*" --exclude ".github/*"
+        run: |
+          # sync using the same variable
+          aws s3 sync . "s3://$BUCKET" --delete --exclude ".git/*" --exclude ".github/*"
 
-      # Setup Terraform
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
