@@ -23,17 +23,17 @@ jobs:
       # Ensure S3 bucket exists
       - name: Ensure S3 bucket exists
         run: |
-          BUCKET=iac-terraform-be-bucket
+          BUCKET=<your-unique-bucket-name>
           if ! aws s3 ls "s3://$BUCKET" >/dev/null 2>&1; then
             echo "Creating S3 bucket $BUCKET..."
-            aws s3 mb s3://$BUCKET
+            aws s3 mb s3://$BUCKET --region us-east-1
           else
             echo "Bucket $BUCKET already exists — skipping creation."
           fi
 
       # Sync repo files to S3
       - name: Sync files to S3
-        run: aws s3 sync . s3://iac-terraform-be-bucket --delete --exclude ".git/*" --exclude ".github/*"
+        run: aws s3 sync . s3://<your-unique-bucket-name> --delete --exclude ".git/*" --exclude ".github/*"
 
       # Setup Terraform
       - name: Set up Terraform
